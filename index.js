@@ -1,16 +1,47 @@
-import puppeteer from 'puppeteer';
+import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
-const GAME_GRID_CLASS = '.puppeteer-target';
-// const URL = 'https://wormle.com';
-const URL = 'http://localhost:3001';
+const GAME_GRID_CLASS = ".puppeteer-target";
+const OUTPUT_PATH_UNSOLVED = "imageUnsolved.png";
+const OUTPUT_PATH_SOLVED = "imageSolved.png";
+const SOLVE_PUZZLE_COMMAND = "window.Wormle.solvePuzzle()";
 
-const browser = await puppeteer.launch();
+async function uploadToS3(s3Client, filename, body) {
+  try {
+    const command = new PutObjectCommand({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: filename,
+      Body: body,
+    });
+
+    const response = await s3Client.send(command);
+    console.log(response);
+    return response;
+  } catch (err) {
+    console.log(err);
+  }
+}
+
+//Using the lightweight chromium build doesn't work locally, see https://github.com/Sparticuz/chromium?tab=readme-ov-file#running-locally--headlessheadful-mode
+const browser = await puppeteer.launch({
+  args: process.env.IS_LOCAL ? puppeteer.defaultArgs() : chromium.args,
+  executablePath: process.env.IS_LOCAL
+    ? process.env.LOCAL_CHROME_PATH
+    : await chromium.executablePath(
+        process.env.AWS_EXECUTION_ENV
+          ? "/opt/nodejs/node_modules/@sparticuz/chromium/bin"
+          : undefined
+      ),
+  headless: process.env.IS_LOCAL ? false : chromium.headless,
+});
+
 const page = await browser.newPage();
 
-await page.goto(URL);
+await page.goto(process.env.WORMLE_URL);
 
 //hide demo modal
-await page.locator('h1').click();
+await page.locator("h1").click();
 
 //Get height/width of the game
 const { width, height } = await page.evaluate((selector) => {
@@ -20,19 +51,34 @@ const { width, height } = await page.evaluate((selector) => {
   return { width: rect.width, height: rect.height };
 }, GAME_GRID_CLASS);
 
-const max = height > width? height : width;
+const max = height > width ? height : width;
 
-await page.addStyleTag({content: `${GAME_GRID_CLASS}{height: ${max}px; width: ${max}px; justify-content: center; padding: 20px}`})
+await page.addStyleTag({
+  content: `${GAME_GRID_CLASS}{height: ${max}px; width: ${max}px; justify-content: center; padding: 20px}`,
+});
 
 const unsolvedGameContainer = await page.waitForSelector(GAME_GRID_CLASS);
-await unsolvedGameContainer.screenshot({path:"output/imageUnsolved.jpg"});
+const screenshotUnsolved = await unsolvedGameContainer.screenshot();
 
-await page.evaluate(`window.Wormle.solvePuzzle()`);
+await page.evaluate(SOLVE_PUZZLE_COMMAND);
 
 //hide win modal
-await page.locator('h1').click();
+await page.locator("h1").click();
 
 const solvedGameContainer = await page.waitForSelector(GAME_GRID_CLASS);
-await solvedGameContainer.screenshot({path:"output/imageSolved.jpg"});
+const screenshotSolved = await solvedGameContainer.screenshot();
 
+//Upload screenshots to S3
+const s3Client = new S3Client({
+  region: process.env.AWS_BUCKET_REGION,
+  credentials: {
+    accessKeyId: process.env.ACCESS_KEY,
+    secretAccessKey: process.env.SECRET_KEY,
+  },
+});
+
+uploadToS3(s3Client, OUTPUT_PATH_UNSOLVED, screenshotUnsolved);
+uploadToS3(s3Client, OUTPUT_PATH_SOLVED, screenshotSolved);
+
+await page.close();
 await browser.close();

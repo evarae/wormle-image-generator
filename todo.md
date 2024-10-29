@@ -1,4 +1,3 @@
-- Add AWS S3 integration
-- Add minimist run config
-- add env file/variables
-- add readme explaining relation to main wormle repo
+- improve resolution
+- Add workflow to upload script to AWS lambda
+- Add tests
