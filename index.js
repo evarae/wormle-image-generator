@@ -38,6 +38,13 @@ const browser = await puppeteer.launch({
 
 const page = await browser.newPage();
 
+//Results in higher resolution image than the default
+await page.setViewport({
+  width: 800,
+  height: 800,
+  deviceScaleFactor: 2,
+});
+
 await page.goto(process.env.WORMLE_URL);
 
 //hide demo modal

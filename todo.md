@@ -1,3 +1,2 @@
-- improve resolution
 - Add workflow to upload script to AWS lambda
 - Add tests
