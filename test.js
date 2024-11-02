@@ -1,4 +1,4 @@
-import { handler } from "./index.js";
+import { handler } from "./index.mjs";
 
 // Mock event and context
 const mockEvent = {}; // Populate with any test data you need
