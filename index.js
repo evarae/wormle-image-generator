@@ -23,69 +23,76 @@ async function uploadToS3(s3Client, filename, body) {
   }
 }
 
-//Using the lightweight chromium build doesn't work locally, see https://github.com/Sparticuz/chromium?tab=readme-ov-file#running-locally--headlessheadful-mode
-const browser = await puppeteer.launch({
-  args: process.env.IS_LOCAL ? puppeteer.defaultArgs() : chromium.args,
-  executablePath: process.env.IS_LOCAL
-    ? process.env.LOCAL_CHROME_PATH
-    : await chromium.executablePath(
-        process.env.AWS_EXECUTION_ENV
-          ? "/opt/nodejs/node_modules/@sparticuz/chromium/bin"
-          : undefined
-      ),
-  headless: process.env.IS_LOCAL ? false : chromium.headless,
-});
+export const handler = async (event, context) => {
+  console.log("EVENT: \n" + JSON.stringify(event, null, 2));
+  await main();
+};
 
-const page = await browser.newPage();
+async function main() {
+  console.log("Creating chromium browser...");
+  //Using the lightweight chromium build doesn't work locally, see https://github.com/Sparticuz/chromium?tab=readme-ov-file#running-locally--headlessheadful-mode
+  const browser = await puppeteer.launch({
+    args: process.env.IS_LOCAL ? puppeteer.defaultArgs() : chromium.args,
+    executablePath: process.env.IS_LOCAL
+      ? process.env.LOCAL_CHROME_PATH
+      : await chromium.executablePath(),
+    headless: process.env.IS_LOCAL ? false : chromium.headless,
+  });
 
-//Results in higher resolution image than the default
-await page.setViewport({
-  width: 800,
-  height: 800,
-  deviceScaleFactor: 2,
-});
+  console.log("Generating screenshots...");
+  const page = await browser.newPage();
 
-await page.goto(process.env.WORMLE_URL);
+  //Results in higher resolution image than the default
+  await page.setViewport({
+    width: 800,
+    height: 800,
+    deviceScaleFactor: 2,
+  });
 
-//hide demo modal
-await page.locator("h1").click();
+  await page.goto(process.env.WORMLE_URL);
 
-//Get height/width of the game
-const { width, height } = await page.evaluate((selector) => {
-  const element = document.querySelector(selector);
-  if (!element) return { width: null, height: null };
-  const rect = element.getBoundingClientRect();
-  return { width: rect.width, height: rect.height };
-}, GAME_GRID_CLASS);
+  //hide demo modal
+  await page.locator("h1").click();
 
-const max = height > width ? height : width;
+  //Get height/width of the game
+  const { width, height } = await page.evaluate((selector) => {
+    const element = document.querySelector(selector);
+    if (!element) return { width: null, height: null };
+    const rect = element.getBoundingClientRect();
+    return { width: rect.width, height: rect.height };
+  }, GAME_GRID_CLASS);
 
-await page.addStyleTag({
-  content: `${GAME_GRID_CLASS}{height: ${max}px; width: ${max}px; justify-content: center; padding: 20px}`,
-});
+  const max = height > width ? height : width;
 
-const unsolvedGameContainer = await page.waitForSelector(GAME_GRID_CLASS);
-const screenshotUnsolved = await unsolvedGameContainer.screenshot();
+  await page.addStyleTag({
+    content: `${GAME_GRID_CLASS}{height: ${max}px; width: ${max}px; justify-content: center; padding: 20px}`,
+  });
 
-await page.evaluate(SOLVE_PUZZLE_COMMAND);
+  const unsolvedGameContainer = await page.waitForSelector(GAME_GRID_CLASS);
+  const screenshotUnsolved = await unsolvedGameContainer.screenshot();
 
-//hide win modal
-await page.locator("h1").click();
+  await page.evaluate(SOLVE_PUZZLE_COMMAND);
 
-const solvedGameContainer = await page.waitForSelector(GAME_GRID_CLASS);
-const screenshotSolved = await solvedGameContainer.screenshot();
+  //hide win modal
+  await page.locator("h1").click();
 
-//Upload screenshots to S3
-const s3Client = new S3Client({
-  region: process.env.AWS_BUCKET_REGION,
-  credentials: {
-    accessKeyId: process.env.ACCESS_KEY,
-    secretAccessKey: process.env.SECRET_KEY,
-  },
-});
+  const solvedGameContainer = await page.waitForSelector(GAME_GRID_CLASS);
+  const screenshotSolved = await solvedGameContainer.screenshot();
 
-uploadToS3(s3Client, OUTPUT_PATH_UNSOLVED, screenshotUnsolved);
-uploadToS3(s3Client, OUTPUT_PATH_SOLVED, screenshotSolved);
+  console.log("Uploading to S3...");
 
-await page.close();
-await browser.close();
+  //Upload screenshots to S3
+  const s3Client = new S3Client({
+    region: process.env.AWS_BUCKET_REGION,
+    credentials: {
+      accessKeyId: process.env.ACCESS_KEY,
+      secretAccessKey: process.env.SECRET_KEY,
+    },
+  });
+
+  uploadToS3(s3Client, OUTPUT_PATH_UNSOLVED, screenshotUnsolved);
+  uploadToS3(s3Client, OUTPUT_PATH_SOLVED, screenshotSolved);
+
+  await page.close();
+  await browser.close();
+}
