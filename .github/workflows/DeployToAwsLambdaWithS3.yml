@@ -9,9 +9,6 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     steps:
-      - name: Install dependencies
-        run: npm install
-
       - name: Checkout code
         uses: actions/checkout@v4
 

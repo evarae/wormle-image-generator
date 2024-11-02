@@ -1,7 +1,7 @@
 {
   "name": "wormle-image-generator",
   "version": "1.0.0",
-  "description": "Generates images from loved wormle puzzles",
+  "description": "Generates images from solved wormle puzzles",
   "main": "src/index.js",
   "scripts": {
     "start": "node --env-file=.env test.js",
