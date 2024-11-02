@@ -25,7 +25,7 @@ jobs:
     needs: setup
     steps:
       - name: Zip Lambda function
-        run: zip -r function.zip . -x "*.git*" "*.github*" "*.md" ".env" "config/*" "*.lambdaignore" "test.js" "output/*"
+        run: zip -r function.zip index.js node_modules/
 
   upload_to_s3:
     runs-on: ubuntu-latest
