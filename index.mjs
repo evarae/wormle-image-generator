@@ -3,8 +3,8 @@ import chromium from "@sparticuz/chromium";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 const GAME_GRID_CLASS = ".puppeteer-target";
-const OUTPUT_PATH_UNSOLVED = "imageUnsolved.png";
-const OUTPUT_PATH_SOLVED = "imageSolved.png";
+const OUTPUT_PATH_UNSOLVED = "imageUnsolved.jpg";
+const OUTPUT_PATH_SOLVED = "imageSolved.jpg";
 const SOLVE_PUZZLE_COMMAND = "window.Wormle.solvePuzzle()";
 
 async function uploadToS3(s3Client, filename, body) {

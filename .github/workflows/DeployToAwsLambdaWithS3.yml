@@ -29,8 +29,9 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           LAMBDA_CODE_BUCKET: ${{ secrets.LAMBDA_CODE_BUCKET }}
+          LAMBDA_NAME: ${{ vars.LAMBDA_NAME }}
         run: |
-          aws s3 cp function.zip s3://$LAMBDA_CODE_BUCKET/function.zip
+          aws s3 cp function.zip s3://$LAMBDA_CODE_BUCKET/$LAMBDA_NAME.zip
 
   deploy_lambda:
     runs-on: ubuntu-latest
@@ -47,9 +48,9 @@ jobs:
         run: |
           aws lambda update-function-code --function-name $LAMBDA_NAME \
             --s3-bucket $LAMBDA_CODE_BUCKET \
-            --s3-key function.zip || \
+            --s3-key $LAMBDA_NAME.zip || \
           aws lambda create-function --function-name $LAMBDA_NAME \
             --runtime nodejs16.x \
             --role $LAMBDA_ROLE_ARN \
             --handler index.handler \
-            --code S3Bucket=$LAMBDA_CODE_BUCKET,S3Key=function.zip
+            --code S3Bucket=$LAMBDA_CODE_BUCKET,S3Key=$LAMBDA_NAME.zip
