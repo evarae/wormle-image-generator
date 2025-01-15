@@ -1,13 +1,19 @@
-import puppeteer from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
-const GAME_GRID_CLASS = ".puppeteer-target";
-const OUTPUT_PATH_UNSOLVED = "imageUnsolved.jpg";
-const OUTPUT_PATH_SOLVED = "imageSolved.jpg";
-const SOLVE_PUZZLE_COMMAND = "window.Wormle.solvePuzzle()";
+const GAME_GRID_CLASS = '.puppeteer-target';
+const OUTPUT_PATH_UNSOLVED = 'imageUnsolved.jpg';
+const OUTPUT_PATH_SOLVED = 'imageSolved.jpg';
+const SOLVE_PUZZLE_COMMAND = 'window.Wormle.solvePuzzle()';
 
 async function uploadToS3(s3Client, filename, body) {
+  console.log(
+    'Uploading ',
+    filename,
+    ' to bucket: ',
+    process.env.AWS_BUCKET_NAME
+  );
   try {
     const command = new PutObjectCommand({
       Bucket: process.env.AWS_BUCKET_NAME,
@@ -24,12 +30,12 @@ async function uploadToS3(s3Client, filename, body) {
 }
 
 export const handler = async (event, context) => {
-  console.log("EVENT: \n" + JSON.stringify(event, null, 2));
+  console.log('EVENT: \n' + JSON.stringify(event, null, 2));
   await main();
 };
 
 async function main() {
-  console.log("Creating chromium browser...");
+  console.log('Creating chromium browser...');
   //Using the lightweight chromium build doesn't work locally, see https://github.com/Sparticuz/chromium?tab=readme-ov-file#running-locally--headlessheadful-mode
   const browser = await puppeteer.launch({
     args: process.env.IS_LOCAL ? puppeteer.defaultArgs() : chromium.args,
@@ -39,7 +45,7 @@ async function main() {
     headless: process.env.IS_LOCAL ? false : chromium.headless,
   });
 
-  console.log("Generating screenshots...");
+  console.log('Generating screenshots...');
   const page = await browser.newPage();
 
   //Results in higher resolution image than the default
@@ -52,7 +58,7 @@ async function main() {
   await page.goto(process.env.WORMLE_URL);
 
   //hide demo modal
-  await page.locator("h1").click();
+  await page.locator('h1').click();
 
   //Get height/width of the game
   const { width, height } = await page.evaluate((selector) => {
@@ -73,13 +79,16 @@ async function main() {
 
   await page.evaluate(SOLVE_PUZZLE_COMMAND);
 
+  //wait for win modal
+  await page.waitForSelector('h2');
+
   //hide win modal
-  await page.locator("h1").click();
+  await page.locator('h1').click();
 
   const solvedGameContainer = await page.waitForSelector(GAME_GRID_CLASS);
   const screenshotSolved = await solvedGameContainer.screenshot();
 
-  console.log("Uploading to S3...");
+  console.log('Uploading to S3...');
 
   //Upload screenshots to S3
   const s3Client = new S3Client({
