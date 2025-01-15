@@ -99,8 +99,8 @@ async function main() {
     },
   });
 
-  uploadToS3(s3Client, OUTPUT_PATH_UNSOLVED, screenshotUnsolved);
-  uploadToS3(s3Client, OUTPUT_PATH_SOLVED, screenshotSolved);
+  await uploadToS3(s3Client, OUTPUT_PATH_UNSOLVED, screenshotUnsolved);
+  await uploadToS3(s3Client, OUTPUT_PATH_SOLVED, screenshotSolved);
 
   await page.close();
   await browser.close();
